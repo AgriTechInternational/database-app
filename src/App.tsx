@@ -4,6 +4,7 @@ import CustomersDB from './pages/CustomersDB';
 import MaterialsDB from './pages/MaterialsDB';
 import MaintenanceDB from './pages/MaintenanceDB';
 import BrokersDB from './pages/BrokersDB';
+import { InstallButton } from './components/InstallButton';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -17,7 +18,10 @@ function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto py-12 px-6">
-      <div className="mb-12 text-center">
+      <div className="absolute top-6 right-6">
+        <InstallButton />
+      </div>
+      <div className="mb-12 text-center mt-6">
         <h1 className="text-4xl font-extrabold tracking-tight mb-4 flex items-center justify-center text-white">
           <Database className="mr-4 text-blue-400" size={40} /> Global Database Hub
         </h1>
@@ -69,6 +73,7 @@ export default function App() {
               <Database size={22} className="mr-2.5 text-blue-400" /> Database Hub
             </h1>
           </div>
+          <InstallButton />
         </header>
       )}
 
