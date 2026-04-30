@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --font-inter: 'Inter', sans-serif;
+  --font-outfit: 'Outfit', sans-serif;
+  --font-cairo: 'Cairo', sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: #020617;
+  color: #f8fafc;
+}
+
+@layer utilities {
+  .financial-card {
+    @apply bg-slate-900/60 border border-slate-800 rounded-[20px] shadow-lg backdrop-blur-md overflow-hidden;
+  }
+  
+  .financial-input {
+    @apply bg-slate-950/50 border border-slate-800 rounded-[12px] px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-medium;
+  }
+}
