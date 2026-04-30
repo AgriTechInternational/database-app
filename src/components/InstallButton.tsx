@@ -32,6 +32,8 @@ export function InstallButton() {
       if (isIOS && !isStandalone) {
         setShowIOSHint(true);
         setTimeout(() => setShowIOSHint(false), 8000);
+      } else if (!isStandalone) {
+        alert("App installation is not ready yet or is managed by your browser. Please use your browser menu (e.g., Chrome menu -> Install / Add to Home Screen).");
       }
     }
   };
