@@ -11,10 +11,19 @@ export default function MaterialsDB() {
   const [formData, setFormData] = useState({
     company_name: '',
     material_number: '',
+    category: 'Material Supplier',
     phone: '',
     address: '',
     notes: ''
   });
+
+  const CATEGORIES = [
+    'Material Supplier',
+    'Film Factory (مصنع فيلم)',
+    'Dye (صبغة)'
+  ];
+
+  const [activeTab, setActiveTab] = useState(CATEGORIES[0]);
 
   useEffect(() => {
     fetchMaterials();
@@ -33,7 +42,7 @@ export default function MaterialsDB() {
       if (!error) {
         setIsAdding(false);
         setEditingId(null);
-        setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' });
+        setFormData({ company_name: '', material_number: '', category: activeTab, phone: '', address: '', notes: '' });
         fetchMaterials();
       } else {
         alert("Error updating material: " + error.message);
@@ -42,7 +51,7 @@ export default function MaterialsDB() {
       const { error } = await supabase.from(tables.MATERIALS).insert([formData]);
       if (!error) {
         setIsAdding(false);
-        setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' });
+        setFormData({ company_name: '', material_number: '', category: activeTab, phone: '', address: '', notes: '' });
         fetchMaterials();
       } else {
         alert("Error adding material: " + error.message);
@@ -54,6 +63,7 @@ export default function MaterialsDB() {
     setFormData({
       company_name: material.company_name || '',
       material_number: material.material_number || '',
+      category: material.category || CATEGORIES[0],
       phone: material.phone || '',
       address: material.address || '',
       notes: material.notes || ''
@@ -71,7 +81,11 @@ export default function MaterialsDB() {
     }
   };
 
-  const filtered = materials.filter(m => m.company_name?.toLowerCase().includes(search.toLowerCase()) || m.material_number?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = materials.filter(m => {
+    const matchesTab = (m.category || CATEGORIES[0]) === activeTab;
+    const matchesSearch = m.company_name?.toLowerCase().includes(search.toLowerCase()) || m.material_number?.toLowerCase().includes(search.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -82,9 +96,32 @@ export default function MaterialsDB() {
           </h2>
           <p className="text-slate-400 mt-1 font-medium">Supply chain entities, vendor numbers, and operational details.</p>
         </div>
-        <button onClick={() => { setIsAdding(!isAdding); setEditingId(null); setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' }); }} className="flex items-center px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
+        <button onClick={() => { setIsAdding(!isAdding); setEditingId(null); setFormData({ company_name: '', material_number: '', category: activeTab, phone: '', address: '', notes: '' }); }} className="flex items-center px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
           <Plus className="mr-2" size={20} /> Add Material
         </button>
+      </div>
+
+      {/* 3 Squares (Tabs) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveTab(cat)}
+            className={`p-6 rounded-2xl flex flex-col items-center justify-center text-center transition-all duration-300 shadow-lg border-2 ${
+              activeTab === cat 
+                ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400' 
+                : 'bg-slate-900/40 border-slate-700/50 text-slate-400 hover:bg-slate-800 hover:border-slate-600'
+            }`}
+          >
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${activeTab === cat ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
+              <Package size={24} />
+            </div>
+            <span className="font-bold text-sm">{cat}</span>
+            <span className="text-xs opacity-70 mt-1">
+              {materials.filter(m => (m.category || CATEGORIES[0]) === cat).length} items
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className="mb-6 relative">
@@ -104,6 +141,12 @@ export default function MaterialsDB() {
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Company Name</label>
                <input required className="financial-input w-full focus:border-emerald-500/50 focus:ring-emerald-500/50" value={formData.company_name} onChange={e => setFormData({...formData, company_name: e.target.value})} placeholder="Global Synthetics..." />
+             </div>
+             <div className="space-y-1.5">
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Category / Type</label>
+               <select className="financial-input w-full focus:border-emerald-500/50 focus:ring-emerald-500/50" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
              </div>
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Material / Vendor Number</label>
