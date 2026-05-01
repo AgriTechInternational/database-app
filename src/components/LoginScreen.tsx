@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, tables } from '../lib/supabase';
 import { Database, Lock, User as UserIcon, AlertTriangle } from 'lucide-react';
 
 const LAST_EMAIL_KEY = 'agritech_last_email_db';
@@ -9,6 +9,7 @@ export default function LoginScreen({ setUser }: { setUser: (user: any) => void 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,16 +29,36 @@ export default function LoginScreen({ setUser }: { setUser: (user: any) => void 
     } catch (err) { console.warn('Pre-login purge ignored:', err); }
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
-        email: cleanEmail, 
-        password 
-      });
-      
-      if (signInError) throw signInError;
-      if (!data.user) throw new Error('Sign in failed');
-      
-      localStorage.setItem(LAST_EMAIL_KEY, cleanEmail);
-      if (setUser) setUser(data.user);
+      if (isSignUp) {
+        console.log('[Auth] Attempting Sign Up...');
+        const { data, error: signUpError } = await supabase.auth.signUp({ 
+          email: cleanEmail, 
+          password 
+        });
+        if (signUpError) throw signUpError;
+        if (!data.user) throw new Error('Sign up failed');
+
+        const defaultRole = cleanEmail.toLowerCase() === 'agritech-production@hotmail.com' ? 'SUPER_ADMIN' : 'PENDING';
+        
+        const { error: profileError } = await supabase
+          .from(tables.PROFILES)
+          .upsert({ id: data.user.id, email: cleanEmail, role: defaultRole });
+
+        if (profileError) throw profileError;
+        localStorage.setItem(LAST_EMAIL_KEY, cleanEmail);
+      } else {
+        console.log('[Auth] Attempting Sign In...');
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+          email: cleanEmail, 
+          password 
+        });
+        
+        if (signInError) throw signInError;
+        if (!data.user) throw new Error('Sign in failed');
+        
+        localStorage.setItem(LAST_EMAIL_KEY, cleanEmail);
+        if (setUser) setUser(data.user);
+      }
     } catch (err: any) {
       console.error('[Auth] Critical Error:', err);
       setError(err.message || 'Authentication Failed');
@@ -57,7 +78,9 @@ export default function LoginScreen({ setUser }: { setUser: (user: any) => void 
           <div className="w-20 h-20 bg-slate-900/80 border border-slate-700 rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-2xl">
             <Database className="text-blue-500" size={40} />
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Global Database Hub</h1>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
+            {isSignUp ? 'Request Clearance' : 'Global Database Hub'}
+          </h1>
           <p className="text-slate-400 font-medium">Restricted Access • Authenticate to continue</p>
         </div>
 
@@ -110,7 +133,15 @@ export default function LoginScreen({ setUser }: { setUser: (user: any) => void 
               ) : (
                 <Lock size={18} className="mr-2" />
               )}
-              {loading ? 'Decrypting...' : 'Authorize Login'}
+              {loading ? 'Decrypting...' : isSignUp ? 'Submit Request' : 'Authorize Login'}
+            </button>
+            
+            <button 
+              type="button" 
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); }} 
+              className="w-full mt-4 py-3 bg-transparent border border-slate-700 hover:border-slate-500 text-slate-300 font-bold rounded-xl transition-all"
+            >
+              {isSignUp ? 'Already Registered? Login' : "Don't have access? Sign Up Here"}
             </button>
           </form>
         </div>

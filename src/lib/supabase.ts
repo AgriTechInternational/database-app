@@ -10,5 +10,6 @@ export const tables = {
     CUSTOMERS: 'db_customers',
     MATERIALS: 'db_materials',
     MAINTENANCE: 'db_maintenance',
-    BROKERS: 'db_brokers'
+    BROKERS: 'db_brokers',
+    PROFILES: 'profiles'
 };
