@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, Users, Trash2, ArrowLeft } from 'lucide-react';
+import { Shield, Users, Trash2, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 
 export default function SettingsDB({ user, onBack, role }: { user: any, onBack: () => void, role: string }) {
   const [activeTab, setActiveTab] = useState('SECURITY');
+  const [pendingCount, setPendingCount] = useState(0);
   const isSuper = role === 'SUPER_USER' || role === 'SUPER_ADMIN';
   const isAdmin = role === 'admin' || role === 'ADMIN' || isSuper;
+
+  useEffect(() => {
+    if (isSuper) {
+      supabase.from('profiles').select('id', { count: 'exact' }).or('is_delete_pending.eq.true,pending_role.not.is.null')
+        .then(({ count }) => setPendingCount(count || 0));
+    }
+  }, [user, isSuper]);
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 flex flex-col">
@@ -44,12 +52,37 @@ export default function SettingsDB({ user, onBack, role }: { user: any, onBack: 
               <span>Authorize Log</span>
             </button>
           )}
+
+          {isSuper && (
+            <button 
+              onClick={() => setActiveTab('REQUESTS')}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'REQUESTS' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <div className="flex items-center space-x-3">
+                <Shield size={18} />
+                <span>Requests Hub</span>
+              </div>
+              {pendingCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Content */}
         <div className="flex-1 p-8 overflow-y-auto">
           {activeTab === 'SECURITY' && <SecurityCenter user={user} />}
-          {activeTab === 'AUTHORIZE' && (isAdmin || isSuper) && <AuthorizeLog role={role} />}
+          {activeTab === 'AUTHORIZE' && (isAdmin || isSuper) && <AuthorizeLog role={role} onRefresh={() => {
+            // update count on changes
+            supabase.from('profiles').select('id', { count: 'exact' }).or('is_delete_pending.eq.true,pending_role.not.is.null')
+              .then(({ count }) => setPendingCount(count || 0));
+          }} />}
+          {activeTab === 'REQUESTS' && isSuper && <RequestsHub onRefresh={() => {
+             supabase.from('profiles').select('id', { count: 'exact' }).or('is_delete_pending.eq.true,pending_role.not.is.null')
+              .then(({ count }) => setPendingCount(count || 0));
+          }} />}
         </div>
       </div>
     </div>
@@ -105,7 +138,7 @@ function SecurityCenter({ user }: { user: any }) {
   );
 }
 
-function AuthorizeLog({ role }: { role: string }) {
+function AuthorizeLog({ role, onRefresh }: { role: string, onRefresh: () => void }) {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isSuper = role === 'SUPER_USER' || role === 'SUPER_ADMIN';
@@ -128,19 +161,26 @@ function AuthorizeLog({ role }: { role: string }) {
     
     if (isSuper) {
       const { error } = await supabase.from("profiles").update({ role: newRole, pending_role: null }).eq("id", userId);
-      if (!error) fetchProfiles();
+      if (!error) {
+        fetchProfiles();
+        onRefresh();
+      }
       else alert("Error: " + error.message);
     } else {
-      // Admins can only request role changes for users that aren't already admins
+      // ...
       const { data: currentProfile } = await supabase.from('profiles').select('role').eq('id', userId).single();
       if (currentProfile?.role === 'PENDING' && newRole === 'ENGINEER') {
         const { error } = await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
-        if (!error) fetchProfiles();
+        if (!error) {
+          fetchProfiles();
+          onRefresh();
+        }
       } else {
         const { error } = await supabase.from("profiles").update({ pending_role: newRole }).eq("id", userId);
         if (!error) {
           alert(`Request submitted. A Super User must approve this role change for ${targetEmail}.`);
           fetchProfiles();
+          onRefresh();
         }
       }
     }
@@ -150,13 +190,17 @@ function AuthorizeLog({ role }: { role: string }) {
     if (isSuper) {
       if (!window.confirm(`Permanently delete profile for ${targetEmail}?`)) return;
       const { error } = await supabase.from('profiles').delete().eq('id', userId);
-      if (!error) fetchProfiles();
+      if (!error) {
+        fetchProfiles();
+        onRefresh();
+      }
       else alert("Error: " + error.message);
     } else {
       const { error } = await supabase.from('profiles').update({ is_delete_pending: true }).eq('id', userId);
       if (!error) {
         alert("Purge Request submitted. A Super User must approve.");
         fetchProfiles();
+        onRefresh();
       }
     }
   };
@@ -231,6 +275,84 @@ function AuthorizeLog({ role }: { role: string }) {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  async function fetchRequests() {
+    setLoading(true);
+    const { data } = await supabase.from('profiles').select('*').or('is_delete_pending.eq.true,pending_role.not.is.null');
+    if (data) setItems(data);
+    setLoading(false);
+  }
+
+  async function approve(p: any) {
+    if (p.is_delete_pending) {
+      if (!window.confirm(`APPROVE PURGE for ${p.email}?`)) return;
+      await supabase.from('profiles').delete().eq('id', p.id);
+    } else {
+      await supabase.from('profiles').update({ role: p.pending_role, pending_role: null }).eq('id', p.id);
+    }
+    fetchRequests();
+    onRefresh();
+  }
+
+  async function reject(p: any) {
+    await supabase.from('profiles').update({ is_delete_pending: false, pending_role: null }).eq('id', p.id);
+    fetchRequests();
+    onRefresh();
+  }
+
+  if (loading) return <div className="text-slate-400">Loading requests...</div>;
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center space-x-3 text-blue-500 mb-6">
+        <Shield size={24} />
+        <h2 className="text-xl font-bold text-white uppercase tracking-tight">Requests Hub</h2>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="financial-card p-12 text-center border-dashed border-slate-700">
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No pending requests in queue</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {items.map(p => (
+            <div key={p.id} className="financial-card p-6 flex items-center justify-between border-slate-700/50 bg-slate-900/40">
+              <div>
+                <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">
+                  {p.is_delete_pending ? 'Purge Request' : `Promotion to ${p.pending_role}`}
+                </div>
+                <div className="font-bold text-slate-200">{p.email}</div>
+                <div className="text-xs text-slate-500">Current Role: {p.role}</div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => approve(p)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all flex items-center"
+                >
+                  <CheckCircle size={14} className="mr-2" /> Approve
+                </button>
+                <button 
+                  onClick={() => reject(p)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-500/30 text-xs font-bold rounded-lg transition-all flex items-center"
+                >
+                  <XCircle size={14} className="mr-2" /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
