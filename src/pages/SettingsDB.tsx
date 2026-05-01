@@ -256,7 +256,7 @@ function AuthorizeLog({ role, onRefresh }: { role: string, onRefresh: () => void
                         >
                           <option value="PENDING">REVOKE ACCESS</option>
                           <option value="ENGINEER">ENGINEER</option>
-                          <option value="ADMIN">ADMIN</option>
+                          <option value="admin">ADMIN</option>
                           {isSuper && <option value="SUPER_USER">SUPER USER</option>}
                         </select>
                         <button 
@@ -312,6 +312,7 @@ function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
         alert("Authorization Error: " + error.message);
       } else {
         console.log("[Auth] Success. Refreshing list...");
+        alert("Protocol Approved: Access has been granted to " + p.email);
         await fetchRequests();
         onRefresh();
       }
@@ -337,9 +338,17 @@ function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center space-x-3 text-blue-500 mb-6">
-        <Shield size={24} />
-        <h2 className="text-xl font-bold text-white uppercase tracking-tight">Requests Hub</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3 text-blue-500">
+          <Shield size={24} />
+          <h2 className="text-xl font-bold text-white uppercase tracking-tight">Requests Hub</h2>
+        </div>
+        <button 
+          onClick={() => fetchRequests()}
+          className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-blue-400 transition-colors"
+        >
+          Force Refresh Queue
+        </button>
       </div>
 
       {items.length === 0 ? (
