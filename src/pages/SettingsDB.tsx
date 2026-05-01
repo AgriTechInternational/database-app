@@ -295,20 +295,42 @@ function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
   }
 
   async function approve(p: any) {
-    if (p.is_delete_pending) {
-      if (!window.confirm(`APPROVE PURGE for ${p.email}?`)) return;
-      await supabase.from('profiles').delete().eq('id', p.id);
-    } else {
-      await supabase.from('profiles').update({ role: p.pending_role, pending_role: null }).eq('id', p.id);
+    try {
+      console.log("[Auth] Approving request for:", p.email);
+      let error;
+      if (p.is_delete_pending) {
+        if (!window.confirm(`APPROVE PURGE for ${p.email}?`)) return;
+        const result = await supabase.from('profiles').delete().eq('id', p.id);
+        error = result.error;
+      } else {
+        const result = await supabase.from('profiles').update({ role: p.pending_role, pending_role: null }).eq('id', p.id);
+        error = result.error;
+      }
+      
+      if (error) {
+        console.error("[Auth] Approval Error:", error);
+        alert("Authorization Error: " + error.message);
+      } else {
+        console.log("[Auth] Success. Refreshing list...");
+        await fetchRequests();
+        onRefresh();
+      }
+    } catch (err: any) {
+      alert("System Error: " + err.message);
     }
-    fetchRequests();
-    onRefresh();
   }
 
   async function reject(p: any) {
-    await supabase.from('profiles').update({ is_delete_pending: false, pending_role: null }).eq('id', p.id);
-    fetchRequests();
-    onRefresh();
+    try {
+      const { error } = await supabase.from('profiles').update({ is_delete_pending: false, pending_role: null }).eq('id', p.id);
+      if (error) alert("Error: " + error.message);
+      else {
+        await fetchRequests();
+        onRefresh();
+      }
+    } catch (err: any) {
+      alert("System Error: " + err.message);
+    }
   }
 
   if (loading) return <div className="text-slate-400">Loading requests...</div>;
