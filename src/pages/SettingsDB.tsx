@@ -303,13 +303,14 @@ function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
         const result = await supabase.from('profiles').delete().eq('id', p.id);
         error = result.error;
       } else {
-        const result = await supabase.from('profiles').update({ role: p.pending_role, pending_role: null }).eq('id', p.id);
+        const normalizedRole = p.pending_role === 'ADMIN' ? 'admin' : p.pending_role;
+        const result = await supabase.from('profiles').update({ role: normalizedRole, pending_role: null }).eq('id', p.id);
         error = result.error;
       }
       
       if (error) {
         console.error("[Auth] Approval Error:", error);
-        alert("Authorization Error: " + error.message);
+        alert("Authorization Error: " + (error.message || JSON.stringify(error)));
       } else {
         console.log("[Auth] Success. Refreshing list...");
         alert("Protocol Approved: Access has been granted to " + p.email);
