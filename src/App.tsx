@@ -1,15 +1,16 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Database, Users, Package, Wrench, Handshake, ChevronLeft, LogOut } from 'lucide-react';
+import { Database, Users, Package, Wrench, Handshake, ChevronLeft, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import CustomersDB from './pages/CustomersDB';
 import MaterialsDB from './pages/MaterialsDB';
 import MaintenanceDB from './pages/MaintenanceDB';
 import BrokersDB from './pages/BrokersDB';
+import SettingsDB from './pages/SettingsDB';
 import { InstallButton } from './components/InstallButton';
 import LoginScreen from './components/LoginScreen';
 
-function Dashboard() {
+function Dashboard({ onOpenSettings }: { onOpenSettings: () => void }) {
   const navigate = useNavigate();
   
   const modules = [
@@ -23,6 +24,13 @@ function Dashboard() {
     <div className="max-w-6xl mx-auto py-12 px-6">
       <div className="absolute top-6 right-6 flex items-center space-x-3">
         <InstallButton />
+        <button 
+          onClick={onOpenSettings}
+          className="p-2.5 bg-slate-800/80 hover:bg-blue-500/20 hover:text-blue-400 text-slate-300 rounded-xl transition-all active:scale-95 border border-slate-700 hover:border-blue-500/30 shadow-sm backdrop-blur-sm"
+          title="System Settings"
+        >
+          <SettingsIcon size={20} />
+        </button>
         <button 
           onClick={() => supabase.auth.signOut()}
           className="p-2.5 bg-slate-800/80 hover:bg-red-500/20 hover:text-red-400 text-slate-300 rounded-xl transition-all active:scale-95 border border-slate-700 hover:border-red-500/30 shadow-sm backdrop-blur-sm"
@@ -70,6 +78,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string>("PENDING");
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -149,6 +158,10 @@ export default function App() {
     );
   }
 
+  if (showSettings) {
+    return <SettingsDB user={user} role={role} onBack={() => setShowSettings(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#020617] font-sans text-slate-200 selection:bg-blue-500/30">
       {/* Global Header */}
@@ -168,6 +181,13 @@ export default function App() {
           <div className="flex items-center space-x-3">
             <InstallButton />
             <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2.5 bg-slate-800 hover:bg-blue-500/20 hover:text-blue-400 text-slate-300 rounded-xl transition-all active:scale-95 border border-slate-700 hover:border-blue-500/30 shadow-sm"
+              title="System Settings"
+            >
+              <SettingsIcon size={20} />
+            </button>
+            <button 
               onClick={() => supabase.auth.signOut()}
               className="p-2.5 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-300 rounded-xl transition-all active:scale-95 border border-slate-700 hover:border-red-500/30 shadow-sm"
               title="Sign Out"
@@ -180,7 +200,7 @@ export default function App() {
 
       <main className={!isDashboard ? "p-6 max-w-7xl mx-auto" : ""}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Dashboard onOpenSettings={() => setShowSettings(true)} />} />
           <Route path="/customers" element={<CustomersDB />} />
           <Route path="/materials" element={<MaterialsDB />} />
           <Route path="/maintenance" element={<MaintenanceDB />} />
