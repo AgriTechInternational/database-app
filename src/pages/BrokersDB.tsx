@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase, tables } from '../lib/supabase';
-import { Handshake, Plus, Briefcase, Phone, MapPin, Search, Filter } from 'lucide-react';
+import { Briefcase, Plus, UserCircle, Phone, MapPin, Search, Filter, Pencil, Trash2 } from 'lucide-react';
 
 export default function BrokersDB() {
   const [brokers, setBrokers] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   
@@ -19,6 +20,7 @@ export default function BrokersDB() {
     category: CATEGORIES[0],
     phone: '',
     address: '',
+    speciality: '',
     notes: ''
   });
 
@@ -32,15 +34,49 @@ export default function BrokersDB() {
     if (error) console.error(error);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from(tables.BROKERS).insert([formData]);
-    if (!error) {
-      setIsAdding(false);
-      setFormData({ name: '', category: CATEGORIES[0], phone: '', address: '', notes: '' });
-      fetchBrokers();
+    if (editingId) {
+      const { error } = await supabase.from(tables.BROKERS).update(formData).eq('id', editingId);
+      if (!error) {
+        setIsAdding(false);
+        setEditingId(null);
+        setFormData({ name: '', category: CATEGORIES[0], phone: '', address: '', speciality: '', notes: '' });
+        fetchBrokers();
+      } else {
+        alert("Error updating broker: " + error.message);
+      }
     } else {
-      alert("Error adding broker: " + error.message);
+      const { error } = await supabase.from(tables.BROKERS).insert([formData]);
+      if (!error) {
+        setIsAdding(false);
+        setFormData({ name: '', category: CATEGORIES[0], phone: '', address: '', speciality: '', notes: '' });
+        fetchBrokers();
+      } else {
+        alert("Error adding broker: " + error.message);
+      }
+    }
+  };
+
+  const handleEdit = (b: any) => {
+    setFormData({
+      name: b.name || '',
+      category: b.category || CATEGORIES[0],
+      phone: b.phone || '',
+      address: b.address || '',
+      speciality: b.speciality || '',
+      notes: b.notes || ''
+    });
+    setEditingId(b.id);
+    setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this broker?")) {
+      const { error } = await supabase.from(tables.BROKERS).delete().eq('id', id);
+      if (!error) fetchBrokers();
+      else alert("Error deleting broker: " + error.message);
     }
   };
 
@@ -55,11 +91,11 @@ export default function BrokersDB() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-3xl font-extrabold text-white flex items-center tracking-tight">
-            <Handshake className="mr-3 text-purple-500" size={32} /> Brokers Database
+            <UserCircle className="mr-3 text-purple-500" size={32} /> Brokers Database
           </h2>
           <p className="text-slate-400 mt-1 font-medium">Intermediaries for machine sales, factory rentals, and deals.</p>
         </div>
-        <button onClick={() => setIsAdding(!isAdding)} className="flex items-center px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
+        <button onClick={() => { setIsAdding(!isAdding); setEditingId(null); setFormData({ name: '', category: CATEGORIES[0], phone: '', address: '', speciality: '', notes: '' }); }} className="flex items-center px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
           <Plus className="mr-2" size={20} /> Add Broker
         </button>
       </div>
@@ -89,7 +125,7 @@ export default function BrokersDB() {
       </div>
 
       {isAdding && (
-        <form onSubmit={handleCreate} className="financial-card p-6 mb-8 border-purple-500/30">
+        <form onSubmit={handleCreateOrUpdate} className="financial-card p-6 mb-8 border-purple-500/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Broker Name</label>
@@ -109,14 +145,18 @@ export default function BrokersDB() {
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Address</label>
                <input className="financial-input w-full focus:border-purple-500/50 focus:ring-purple-500/50" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Corporate address..." />
              </div>
+             <div className="space-y-1.5">
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Speciality</label>
+               <input className="financial-input w-full focus:border-purple-500/50 focus:ring-purple-500/50" value={formData.speciality} onChange={e => setFormData({...formData, speciality: e.target.value})} placeholder="e.g. Lathe Machines" />
+             </div>
              <div className="md:col-span-2 space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Internal Notes</label>
                <textarea className="financial-input w-full min-h-[100px] focus:border-purple-500/50 focus:ring-purple-500/50" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Commission rates, past deals..." />
              </div>
           </div>
           <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-slate-800/60">
-             <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
-             <button type="submit" className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">Save Broker</button>
+             <button type="button" onClick={() => { setIsAdding(false); setEditingId(null); }} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
+             <button type="submit" className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">{editingId ? 'Update Record' : 'Save Record'}</button>
           </div>
         </form>
       )}
@@ -146,6 +186,20 @@ export default function BrokersDB() {
                     <MapPin size={14} className="text-slate-500 mr-3 shrink-0" />
                     <span className="text-slate-300 font-medium">{b.address || 'N/A'}</span>
                   </div>
+                  <div className="flex items-center text-sm">
+                    <div className="w-[14px] mr-3 shrink-0"></div>
+                    <p className="text-sm font-medium text-slate-400">Spec: {b.speciality || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end space-x-2 mt-4">
+                  <button onClick={() => handleEdit(b)} className="p-1.5 text-slate-400 hover:text-purple-400 hover:bg-purple-400/10 rounded-lg transition-colors" title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(b.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 {b.notes && (

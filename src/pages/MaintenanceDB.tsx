@@ -1,27 +1,28 @@
 import { useState, useEffect } from 'react';
 import { supabase, tables } from '../lib/supabase';
-import { Wrench, Plus, Cog, Phone, MapPin, Search, Filter } from 'lucide-react';
+import { Wrench, Plus, Building, Phone, MapPin, Search, Pencil, Trash2 } from 'lucide-react';
 
 export default function MaintenanceDB() {
   const [maintenance, setMaintenance] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   
   const [formData, setFormData] = useState({
     name: '',
-    category: 'People we are building the cores at',
+    equipment: 'General Machinery',
     phone: '',
     address: '',
     notes: ''
   });
 
-  const CATEGORIES = [
-    'People we are building the cores at',
+  const EQUIPMENTS = [
+    'General Machinery',
     'CNC metal repair',
-    'General Machinery Repair',
     'Electrical Systems',
-    'HVAC Maintenance'
+    'HVAC Maintenance',
+    'Other'
   ];
 
   useEffect(() => {
@@ -34,21 +35,54 @@ export default function MaintenanceDB() {
     if (error) console.error(error);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from(tables.MAINTENANCE).insert([formData]);
-    if (!error) {
-      setIsAdding(false);
-      setFormData({ name: '', category: CATEGORIES[0], phone: '', address: '', notes: '' });
-      fetchMaintenance();
+    if (editingId) {
+      const { error } = await supabase.from(tables.MAINTENANCE).update(formData).eq('id', editingId);
+      if (!error) {
+        setIsAdding(false);
+        setEditingId(null);
+        setFormData({ name: '', phone: '', address: '', equipment: 'General Machinery', notes: '' });
+        fetchMaintenance();
+      } else {
+        alert("Error updating maintenance record: " + error.message);
+      }
     } else {
-      alert("Error adding maintenance partner: " + error.message);
+      const { error } = await supabase.from(tables.MAINTENANCE).insert([formData]);
+      if (!error) {
+        setIsAdding(false);
+        setFormData({ name: '', phone: '', address: '', equipment: 'General Machinery', notes: '' });
+        fetchMaintenance();
+      } else {
+        alert("Error adding maintenance record: " + error.message);
+      }
+    }
+  };
+
+  const handleEdit = (m: any) => {
+    setFormData({
+      name: m.name || '',
+      phone: m.phone || '',
+      address: m.address || '',
+      equipment: m.equipment || '',
+      notes: m.notes || ''
+    });
+    setEditingId(m.id);
+    setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this maintenance record?")) {
+      const { error } = await supabase.from(tables.MAINTENANCE).delete().eq('id', id);
+      if (!error) fetchMaintenance();
+      else alert("Error deleting maintenance record: " + error.message);
     }
   };
 
   const filtered = maintenance.filter(m => {
     const matchesSearch = m.name?.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filterCategory ? m.category === filterCategory : true;
+    const matchesFilter = filterCategory ? m.equipment === filterCategory : true;
     return matchesSearch && matchesFilter;
   });
 
@@ -61,8 +95,8 @@ export default function MaintenanceDB() {
           </h2>
           <p className="text-slate-400 mt-1 font-medium">Equipment contractors, repair shops, and maintenance partners.</p>
         </div>
-        <button onClick={() => setIsAdding(!isAdding)} className="flex items-center px-5 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
-          <Plus className="mr-2" size={20} /> Add Partner
+        <button onClick={() => { setIsAdding(!isAdding); setEditingId(null); setFormData({ name: '', phone: '', address: '', equipment: 'General Machinery', notes: '' }); }} className="flex items-center px-5 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
+          <Plus className="mr-2" size={20} /> Add Provider
         </button>
       </div>
 
@@ -78,20 +112,19 @@ export default function MaintenanceDB() {
           />
         </div>
         <div className="relative md:w-72">
-          <Filter className="absolute left-4 top-3.5 text-slate-500" size={20} />
           <select 
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
-            className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl pl-12 pr-4 py-3.5 text-white appearance-none focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium backdrop-blur-sm cursor-pointer"
+            className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl px-4 py-3.5 text-white appearance-none focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium backdrop-blur-sm cursor-pointer"
           >
             <option value="">All Equipment/Categories</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {EQUIPMENTS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>
 
       {isAdding && (
-        <form onSubmit={handleCreate} className="financial-card p-6 mb-8 border-amber-500/30">
+        <form onSubmit={handleCreateOrUpdate} className="financial-card p-6 mb-8 border-amber-500/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Entity Name</label>
@@ -99,8 +132,8 @@ export default function MaintenanceDB() {
              </div>
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Equipment / Category</label>
-               <select className="financial-input w-full focus:border-amber-500/50 focus:ring-amber-500/50" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+               <select className="financial-input w-full focus:border-amber-500/50 focus:ring-amber-500/50" value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})}>
+                 {EQUIPMENTS.map(c => <option key={c} value={c}>{c}</option>)}
                </select>
              </div>
              <div className="space-y-1.5">
@@ -117,8 +150,8 @@ export default function MaintenanceDB() {
              </div>
           </div>
           <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-slate-800/60">
-             <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
-             <button type="submit" className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">Save Partner</button>
+             <button type="button" onClick={() => { setIsAdding(false); setEditingId(null); }} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
+             <button type="submit" className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">{editingId ? 'Update Record' : 'Save Record'}</button>
           </div>
         </form>
       )}
@@ -129,14 +162,21 @@ export default function MaintenanceDB() {
              <div className="p-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-12 h-12 rounded-2xl bg-amber-900/30 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner">
-                    <Cog size={24} />
+                    <Building size={24} />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white tracking-tight">{m.name}</h3>
-                    <div className="flex items-center mt-0.5 text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 w-fit">
-                      {m.category}
-                    </div>
+                    <p className="text-sm font-medium text-amber-500 mt-1">{m.equipment}</p>
                   </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 mb-3">
+                  <button onClick={() => handleEdit(m)} className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors" title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(m.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/40">

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase, tables } from '../lib/supabase';
-import { Package, Plus, Building2, Phone, MapPin, Search, Hash } from 'lucide-react';
+import { Package, Plus, Building2, Phone, MapPin, Search, Pencil, Trash2 } from 'lucide-react';
 
 export default function MaterialsDB() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   
   const [formData, setFormData] = useState({
@@ -25,15 +26,48 @@ export default function MaterialsDB() {
     if (error) console.error(error);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from(tables.MATERIALS).insert([formData]);
-    if (!error) {
-      setIsAdding(false);
-      setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' });
-      fetchMaterials();
+    if (editingId) {
+      const { error } = await supabase.from(tables.MATERIALS).update(formData).eq('id', editingId);
+      if (!error) {
+        setIsAdding(false);
+        setEditingId(null);
+        setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' });
+        fetchMaterials();
+      } else {
+        alert("Error updating material: " + error.message);
+      }
     } else {
-      alert("Error adding material: " + error.message);
+      const { error } = await supabase.from(tables.MATERIALS).insert([formData]);
+      if (!error) {
+        setIsAdding(false);
+        setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' });
+        fetchMaterials();
+      } else {
+        alert("Error adding material: " + error.message);
+      }
+    }
+  };
+
+  const handleEdit = (material: any) => {
+    setFormData({
+      company_name: material.company_name || '',
+      material_number: material.material_number || '',
+      phone: material.phone || '',
+      address: material.address || '',
+      notes: material.notes || ''
+    });
+    setEditingId(material.id);
+    setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this material?")) {
+      const { error } = await supabase.from(tables.MATERIALS).delete().eq('id', id);
+      if (!error) fetchMaterials();
+      else alert("Error deleting material: " + error.message);
     }
   };
 
@@ -48,8 +82,8 @@ export default function MaterialsDB() {
           </h2>
           <p className="text-slate-400 mt-1 font-medium">Supply chain entities, vendor numbers, and operational details.</p>
         </div>
-        <button onClick={() => setIsAdding(!isAdding)} className="flex items-center px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
-          <Plus className="mr-2" size={20} /> Add Supplier
+        <button onClick={() => { setIsAdding(!isAdding); setEditingId(null); setFormData({ company_name: '', material_number: '', phone: '', address: '', notes: '' }); }} className="flex items-center px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
+          <Plus className="mr-2" size={20} /> Add Material
         </button>
       </div>
 
@@ -65,7 +99,7 @@ export default function MaterialsDB() {
       </div>
 
       {isAdding && (
-        <form onSubmit={handleCreate} className="financial-card p-6 mb-8 border-emerald-500/30">
+        <form onSubmit={handleCreateOrUpdate} className="financial-card p-6 mb-8 border-emerald-500/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Company Name</label>
@@ -89,8 +123,8 @@ export default function MaterialsDB() {
              </div>
           </div>
           <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-slate-800/60">
-             <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
-             <button type="submit" className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">Save Record</button>
+             <button type="button" onClick={() => { setIsAdding(false); setEditingId(null); }} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
+             <button type="submit" className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">{editingId ? 'Update Record' : 'Save Record'}</button>
           </div>
         </form>
       )}
@@ -106,9 +140,19 @@ export default function MaterialsDB() {
                   <div>
                     <h3 className="text-lg font-bold text-white tracking-tight">{m.company_name}</h3>
                     <div className="flex items-center mt-0.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 w-fit">
-                      <Hash size={12} className="mr-1" /> {m.material_number}
+                      <p className="text-sm font-medium text-slate-400">Material No: {m.material_number}</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end space-x-2 mb-3">
+                  <button onClick={() => handleEdit(m)} className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors" title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(m.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/40">

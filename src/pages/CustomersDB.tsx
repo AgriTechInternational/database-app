@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase, tables } from '../lib/supabase';
-import { Users, Plus, Star, Building, Phone, MapPin, Search } from 'lucide-react';
+import { Users, Plus, Star, Building, Phone, MapPin, Search, Pencil, Trash2 } from 'lucide-react';
 
 export default function CustomersDB() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   
   // Form State
@@ -26,15 +27,48 @@ export default function CustomersDB() {
     if (error) console.error(error);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreateOrUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from(tables.CUSTOMERS).insert([{ ...formData, stars: 0 }]); // Stars start at 0, updated via Finance App
-    if (!error) {
-      setIsAdding(false);
-      setFormData({ org_name: '', contact_person: '', phone: '', address: '', notes: '' });
-      fetchCustomers();
+    if (editingId) {
+      const { error } = await supabase.from(tables.CUSTOMERS).update(formData).eq('id', editingId);
+      if (!error) {
+        setIsAdding(false);
+        setEditingId(null);
+        setFormData({ org_name: '', contact_person: '', phone: '', address: '', notes: '' });
+        fetchCustomers();
+      } else {
+        alert("Error updating customer: " + error.message);
+      }
     } else {
-      alert("Error adding customer: " + error.message);
+      const { error } = await supabase.from(tables.CUSTOMERS).insert([{ ...formData, stars: 0 }]);
+      if (!error) {
+        setIsAdding(false);
+        setFormData({ org_name: '', contact_person: '', phone: '', address: '', notes: '' });
+        fetchCustomers();
+      } else {
+        alert("Error adding customer: " + error.message);
+      }
+    }
+  };
+
+  const handleEdit = (customer: any) => {
+    setFormData({
+      org_name: customer.org_name || '',
+      contact_person: customer.contact_person || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      notes: customer.notes || ''
+    });
+    setEditingId(customer.id);
+    setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this customer?")) {
+      const { error } = await supabase.from(tables.CUSTOMERS).delete().eq('id', id);
+      if (!error) fetchCustomers();
+      else alert("Error deleting customer: " + error.message);
     }
   };
 
@@ -49,7 +83,7 @@ export default function CustomersDB() {
           </h2>
           <p className="text-slate-400 mt-1 font-medium">Manage organizations, contacts, and recommendations.</p>
         </div>
-        <button onClick={() => setIsAdding(!isAdding)} className="flex items-center px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
+        <button onClick={() => { setIsAdding(!isAdding); setEditingId(null); setFormData({ org_name: '', contact_person: '', phone: '', address: '', notes: '' }); }} className="flex items-center px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95">
           <Plus className="mr-2" size={20} /> Add Customer
         </button>
       </div>
@@ -66,7 +100,7 @@ export default function CustomersDB() {
       </div>
 
       {isAdding && (
-        <form onSubmit={handleCreate} className="financial-card p-6 mb-8 border-blue-500/30">
+        <form onSubmit={handleCreateOrUpdate} className="financial-card p-6 mb-8 border-blue-500/30">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
              <div className="space-y-1.5">
                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Organization Name</label>
@@ -90,8 +124,8 @@ export default function CustomersDB() {
              </div>
           </div>
           <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-slate-800/60">
-             <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
-             <button type="submit" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">Save Record</button>
+             <button type="button" onClick={() => { setIsAdding(false); setEditingId(null); }} className="px-6 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition-colors">Cancel</button>
+             <button type="submit" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">{editingId ? 'Update Record' : 'Save Record'}</button>
           </div>
         </form>
       )}
@@ -110,11 +144,21 @@ export default function CustomersDB() {
                       <p className="text-sm font-medium text-slate-400">{c.contact_person}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20" title="Auto-updated based on Finance App activity">
+                   <div className="flex items-center space-x-1 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20" title="Auto-updated based on Finance App activity">
                      {Array.from({ length: Math.min(c.stars || 0, 5) }).map((_, i) => <Star key={i} size={14} className="text-amber-400 fill-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />)}
                      {Array.from({ length: 5 - Math.min(c.stars || 0, 5) }).map((_, i) => <Star key={i} size={14} className="text-slate-700" />)}
                      <span className="ml-1.5 text-xs font-bold text-amber-500">{c.stars || 0}</span>
                   </div>
+                </div>
+                
+                {/* Actions */}
+                <div className="flex justify-end space-x-2 mb-3">
+                  <button onClick={() => handleEdit(c)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors" title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(c.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/40">
