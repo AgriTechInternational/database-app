@@ -313,7 +313,7 @@ function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
       } else {
         console.log("[Auth] Success. Refreshing list...");
         alert("Protocol Approved: Access has been granted to " + p.email);
-        await fetchRequests();
+        setItems(prev => prev.filter(item => item.id !== p.id));
         onRefresh();
       }
     } catch (err: any) {
@@ -326,7 +326,7 @@ function RequestsHub({ onRefresh }: { onRefresh: () => void }) {
       const { error } = await supabase.from('profiles').update({ is_delete_pending: false, pending_role: null }).eq('id', p.id);
       if (error) alert("Error: " + error.message);
       else {
-        await fetchRequests();
+        setItems(prev => prev.filter(item => item.id !== p.id));
         onRefresh();
       }
     } catch (err: any) {
