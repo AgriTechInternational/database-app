@@ -68,20 +68,54 @@ export default function App() {
   const isDashboard = location.pathname === '/';
   
   const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string>("PENDING");
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      setLoadingAuth(false);
+      if (!session?.user) setLoadingAuth(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (!session?.user) setLoadingAuth(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchRole = async () => {
+      const superEmails = [
+        "agritech-production@hotmail.com", 
+        "ahmed.farid@agritech.com", 
+        "ahmedfarid@agritech.com",
+        "miarafa@gmail.com",
+        "agritechinternationalfactory@gmail.com"
+      ];
+      
+      let detectedRole = "PENDING";
+      
+      try {
+        const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        if (data) detectedRole = data.role || "PENDING";
+      } catch (err) {
+        console.warn("Profile fetch failed", err);
+      }
+      
+      if (superEmails.includes(user.email?.toLowerCase().trim())) {
+        detectedRole = "SUPER_USER";
+      }
+      
+      setRole(detectedRole);
+      setLoadingAuth(false);
+    };
+    
+    fetchRole();
+  }, [user]);
 
   if (loadingAuth) {
     return (
@@ -93,6 +127,26 @@ export default function App() {
 
   if (!user) {
     return <LoginScreen setUser={setUser} />;
+  }
+
+  if (role === "PENDING") {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-center">
+        <div className="financial-card p-10 shadow-2xl border-amber-500/30 max-w-md w-full">
+          <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl mx-auto flex items-center justify-center mb-6">
+             <Database className="text-amber-500" size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Clearance Pending</h2>
+          <p className="text-slate-400 mb-8 font-medium">{user.email}</p>
+          <button 
+            onClick={() => { supabase.auth.signOut(); setUser(null); }}
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition-all border border-slate-700 hover:border-slate-600"
+          >
+            Disconnect Session
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
