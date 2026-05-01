@@ -1,10 +1,13 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Database, Users, Package, Wrench, Handshake, ChevronLeft } from 'lucide-react';
+import { Database, Users, Package, Wrench, Handshake, ChevronLeft, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import CustomersDB from './pages/CustomersDB';
 import MaterialsDB from './pages/MaterialsDB';
 import MaintenanceDB from './pages/MaintenanceDB';
 import BrokersDB from './pages/BrokersDB';
 import { InstallButton } from './components/InstallButton';
+import LoginScreen from './components/LoginScreen';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -18,8 +21,15 @@ function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto py-12 px-6">
-      <div className="absolute top-6 right-6">
+      <div className="absolute top-6 right-6 flex items-center space-x-3">
         <InstallButton />
+        <button 
+          onClick={() => supabase.auth.signOut()}
+          className="p-2.5 bg-slate-800/80 hover:bg-red-500/20 hover:text-red-400 text-slate-300 rounded-xl transition-all active:scale-95 border border-slate-700 hover:border-red-500/30 shadow-sm backdrop-blur-sm"
+          title="Sign Out"
+        >
+          <LogOut size={20} />
+        </button>
       </div>
       <div className="mb-12 text-center mt-6">
         <h1 className="text-4xl font-extrabold tracking-tight mb-4 flex items-center justify-center text-white">
@@ -56,6 +66,34 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const isDashboard = location.pathname === '/';
+  
+  const [user, setUser] = useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoadingAuth(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen setUser={setUser} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#020617] font-sans text-slate-200 selection:bg-blue-500/30">
@@ -73,7 +111,16 @@ export default function App() {
               <Database size={22} className="mr-2.5 text-blue-400" /> Database Hub
             </h1>
           </div>
-          <InstallButton />
+          <div className="flex items-center space-x-3">
+            <InstallButton />
+            <button 
+              onClick={() => supabase.auth.signOut()}
+              className="p-2.5 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-300 rounded-xl transition-all active:scale-95 border border-slate-700 hover:border-red-500/30 shadow-sm"
+              title="Sign Out"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
         </header>
       )}
 
